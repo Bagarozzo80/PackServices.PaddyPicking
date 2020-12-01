@@ -321,10 +321,8 @@ namespace PaddyPicking
                 foreach (PP_magamov item in listReadyPro)
                     sbSQL.AppendLine(string.Format(SQLUpdateReadyPro, item.ingombro_merce, 60013, int.Parse(item.magaord_id)));
 
-                if (!string.IsNullOrEmpty(sbSQL.ToString())) { 
-                    //readyUtilita.EseguiScript(sbSQL.ToString());
-                    EventLog.WriteEntry(nameof(PaddyService), "Check Entity [PP_magamov] : Esegui Script!", EventLogEntryType.Information);
-                }
+                //if (!string.IsNullOrEmpty(sbSQL.ToString()))
+                //readyUtilita.EseguiScript(sbSQL.ToString());
             }
             catch (Exception ex)
             {
