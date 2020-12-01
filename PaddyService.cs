@@ -130,7 +130,7 @@ namespace PaddyPicking
 
                     string ragioneSociale = string.IsNullOrEmpty(splitDestinazione.GetValue(2).ToString()) ? splitDestinazione.GetValue(1).ToString() : string.Concat(splitDestinazione.GetValue(1).ToString(), " ", splitDestinazione.GetValue(2).ToString());
 
-                    string destinatario = splitDestinazioneBolla.Length > 0 ?
+                    string destinatario = splitDestinazioneBolla.Length > 1 ?
                         string.IsNullOrEmpty(splitDestinazioneBolla.GetValue(2).ToString()) ? splitDestinazioneBolla.GetValue(1).ToString() : string.Concat(splitDestinazioneBolla.GetValue(1).ToString(), " ", splitDestinazioneBolla.GetValue(2).ToString()) :
                         string.IsNullOrEmpty(splitDestinazione.GetValue(2).ToString()) ? splitDestinazione.GetValue(1).ToString() : string.Concat(splitDestinazione.GetValue(1).ToString(), " ", splitDestinazione.GetValue(2).ToString());
 
@@ -213,16 +213,16 @@ namespace PaddyPicking
                         destinazione = new PP_destinazione
                         {
                             id = destinazioneID,
-                            tipo = splitDestinazioneBolla.Length > 0 ? "C" : splitDestinazione.GetValue(0).ToString(),
+                            tipo = splitDestinazioneBolla.Length > 1 ? "C" : splitDestinazione.GetValue(0).ToString(),
                             ragso = ragioneSociale,
                             piva = item.destinazione_piva,
                             cf = item.destinazione_cf,
                             destinatario = destinatario,
-                            nazione = splitDestinazioneBolla.Length > 0 ? splitDestinazioneBolla.GetValue(8).ToString() : splitDestinazione.GetValue(3).ToString(),
-                            indirizzo = splitDestinazioneBolla.Length > 0 ? splitDestinazioneBolla.GetValue(3).ToString() : splitDestinazione.GetValue(4).ToString(),
-                            citta = splitDestinazioneBolla.Length > 0 ? splitDestinazioneBolla.GetValue(6).ToString() : splitDestinazione.GetValue(5).ToString(),
-                            provincia = splitDestinazioneBolla.Length > 0 ? splitDestinazioneBolla.GetValue(7).ToString() : splitDestinazione.GetValue(6).ToString(),
-                            cap = splitDestinazioneBolla.Length > 0 ? splitDestinazioneBolla.GetValue(5).ToString() : splitDestinazione.GetValue(7).ToString(),
+                            nazione = splitDestinazioneBolla.Length > 1 ? splitDestinazioneBolla.GetValue(8).ToString() : splitDestinazione.GetValue(3).ToString(),
+                            indirizzo = splitDestinazioneBolla.Length > 1 ? splitDestinazioneBolla.GetValue(3).ToString() : splitDestinazione.GetValue(4).ToString(),
+                            citta = splitDestinazioneBolla.Length > 1 ? splitDestinazioneBolla.GetValue(6).ToString() : splitDestinazione.GetValue(5).ToString(),
+                            provincia = splitDestinazioneBolla.Length > 1 ? splitDestinazioneBolla.GetValue(7).ToString() : splitDestinazione.GetValue(6).ToString(),
+                            cap = splitDestinazioneBolla.Length > 1 ? splitDestinazioneBolla.GetValue(5).ToString() : splitDestinazione.GetValue(7).ToString(),
                             note = "",
                             area = "",
                             areaorder = 0,
