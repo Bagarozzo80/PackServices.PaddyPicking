@@ -121,8 +121,11 @@ namespace PaddyPicking
                 //leggo gli ordini da inserire sul sistema Paddy Picking
                 var list = _paddyPickingService.GetAllPaddyPicking().ToList();
 
+                int idxRow = 1;
                 foreach (PackServices.ReadyPro.Data.Models.PaddyPicking item in list)
                 {
+                    //EventLog.WriteEntry(nameof(PaddyService), "idxRow: " + idxRow + "; Id:" + item.id.ToString(), EventLogEntryType.Information);
+
                     string[] splitDestinazione = item.destinazione.Split('|');
                     string[] splitDestinazioneBolla = item.destinazione_bolla.Replace("$", string.Empty).Replace("{", string.Empty).Replace("}", string.Empty).Split('|');
 
@@ -153,7 +156,8 @@ namespace PaddyPicking
                             glotto = "N",
                             gmatr = "N",
                             note = item.articolo_note,
-                            ubicazione = string.IsNullOrEmpty(item.articolo_ubicazione) ? "nd" : item.articolo_ubicazione
+                            ubicazione = string.IsNullOrEmpty(item.articolo_ubicazione) ? "nd" : item.articolo_ubicazione,
+                            cod_fornitore = string.IsNullOrEmpty(item.cod_fornitore) ? "nd" : item.cod_fornitore
                         };
 
                         sbSQL.AppendLine(string.Format(SQLInsert_Articolo,
@@ -307,6 +311,8 @@ namespace PaddyPicking
 
                         //_paddyPickingService.Create(magaOrd);
                     }
+
+                    idxRow++;
                 }
 
                 if (!string.IsNullOrEmpty(sbSQL.ToString()))
@@ -322,7 +328,7 @@ namespace PaddyPicking
                     sbSQL.AppendLine(string.Format(SQLUpdateReadyPro, item.ingombro_merce, 60013, int.Parse(item.magaord_id)));
 
                 //if (!string.IsNullOrEmpty(sbSQL.ToString()))
-                    //readyUtilita.EseguiScript(sbSQL.ToString());
+                //readyUtilita.EseguiScript(sbSQL.ToString());
             }
             catch (Exception ex)
             {
