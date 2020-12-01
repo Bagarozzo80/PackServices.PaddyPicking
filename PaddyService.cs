@@ -322,7 +322,7 @@ namespace PaddyPicking
                     sbSQL.AppendLine(string.Format(SQLUpdateReadyPro, item.ingombro_merce, 60013, int.Parse(item.magaord_id)));
 
                 //if (!string.IsNullOrEmpty(sbSQL.ToString()))
-                //readyUtilita.EseguiScript(sbSQL.ToString());
+                    //readyUtilita.EseguiScript(sbSQL.ToString());
             }
             catch (Exception ex)
             {
