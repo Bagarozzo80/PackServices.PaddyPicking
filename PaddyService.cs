@@ -256,7 +256,7 @@ namespace PaddyPicking
                             doctipo_id = item.doctipo_id,
                             sezionale = item.sezionale,
                             maga_lotto = item.maga_lotto,
-                            destinazione_id = destinazione.id,
+                            destinazione_id = destinazione is null ? destinazioneID : destinazione.id,
                             dataconsegna = item.dataconsegna,
                             qnt = (int)item.qnt,
                             lista_id = item.urgente ? "URGENTE" : item.lista_id,
