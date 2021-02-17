@@ -83,6 +83,9 @@ namespace PaddyPicking
             //string SQLUpdate_BolleDettaglio = "UPDATE [Bolle dettaglio] SET [Quantita' rientrata] = {0} WHERE [ID bolla dettaglio] = {1};";
             string SQLUpdate_MagaMov = "UPDATE PP_magamov SET erp_update = {0} WHERE id = {1};";
 
+            //liste contente gli ID presenti nelle istruzioni insert
+            List<string> idsDestinazione = new List<string>();
+
             StringBuilder sbSQL = new StringBuilder();
 
             try
@@ -190,8 +193,11 @@ namespace PaddyPicking
 
                     //tabella PP_destinazione
                     var destinazione = _paddyPickingService.GetDestinazione(destinazioneID);
-                    if (destinazione is null)
+                    if (destinazione is null && !idsDestinazione.Contains(destinazioneID))
                     {
+                        //aggiuno la destinazione agli ID da inserire
+                        idsDestinazione.Add(destinazioneID);
+
                         destinazione = new PP_destinazione
                         {
                             id = destinazioneID,
