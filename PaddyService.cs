@@ -22,8 +22,6 @@ namespace PaddyPicking
         private readonly IPaddyPickingService _paddyPickingService;
         private readonly IDocumentService _documentService;
 
-        //private System.Timers.Timer timerAllineaEntita;
-        //private System.Timers.Timer timerAggiornaReadyPro;
         private System.Timers.Timer timerCheckEntity;
 
         Utilita readyUtilita = new Utilita();
@@ -47,16 +45,6 @@ namespace PaddyPicking
             timerCheckEntity.Interval = 60000;
             timerCheckEntity.Elapsed += new ElapsedEventHandler(timerCheckEntity_Elapsed);
             timerCheckEntity.Enabled = true;
-
-            //timerAllineaEntita = new System.Timers.Timer();
-            //timerAllineaEntita.Interval = 60000;
-            //timerAllineaEntita.Elapsed += new ElapsedEventHandler(timerAllineaEntita_Elapsed);
-            //timerAllineaEntita.Enabled = true;
-
-            //timerAggiornaReadyPro = new System.Timers.Timer();
-            //timerAggiornaReadyPro.Interval = 60000;
-            //timerAggiornaReadyPro.Elapsed += new ElapsedEventHandler(timerAggiornaReadyPro_Elapsed);
-            //timerAggiornaReadyPro.Enabled = true;
         }
 
         protected override void OnStop()
@@ -77,42 +65,23 @@ namespace PaddyPicking
             _thread.Start();
         }
 
-        //protected void timerAllineaEntita_Elapsed(object sender, ElapsedEventArgs e)
-        //{
-        //    DateTime dtProcess = DateTime.Now;
-
-        //    Control.CheckForIllegalCrossThreadCalls = false;
-
-        //    _thread = new Thread(CheckEntity);
-        //    _thread.Name = "Paddy Picking - Allinea entità";
-        //    _thread.IsBackground = true;
-        //    _thread.Priority = ThreadPriority.Normal;
-        //    _thread.Start();
-        //}
-
-        //protected void timerAggiornaReadyPro_Elapsed(object sender, ElapsedEventArgs e)
-        //{
-        //    DateTime dtProcess = DateTime.Now;
-
-        //    Control.CheckForIllegalCrossThreadCalls = false;
-
-        //    _thread = new Thread(AggiornaReadyPro);
-        //    _thread.Name = "Paddy Picking - Aggiorna Ready Pro";
-        //    _thread.IsBackground = true;
-        //    _thread.Priority = ThreadPriority.Normal;
-        //    _thread.Start();
-        //}
-
         protected void CheckEntity()
         {
             string dtInizio = DateTime.Now.ToString();
 
+            //istruzioni INSERT
             string SQLInsert_Articolo = "INSERT INTO [dbo].[PP_articolo] ([id], [maga_id], [vano_id], [descr], [descrprint], [cat], [catorder], [umxpz], [umisu], [multipli], [glotto], [gmatr], [note], [ubicazione], [cod_fornitore]) VALUES ('{0}', '{1}', '{2}', '{3}', '{4}', '{5}', '{6}', {7}, '{8}', {9}, '{10}', '{11}', '{12}', '{13}', '{14}');";
             string SQLInsert_Magazzino = "INSERT INTO [dbo].[PP_maga] ([maga_id], [articolo_id], [vano_id], [maga_lotto], [giac]) VALUES ('{0}', '{1}', '{2}', '{3}', {4});";
             string SQLInsert_Destinazione = "INSERT INTO [dbo].[PP_destinazione] ([id], [tipo], [ragso], [piva], [cf], [destinatario], [nazione], [indirizzo], [citta], [provincia], [cap], [note], [area], [areaorder], [prioritario]) VALUES ('{0}', '{1}', '{2}', '{3}', '{4}', '{5}', '{6}', '{7}', '{8}', '{9}', '{10}', '{11}', '{12}', {13}, {14});";
             string SQLInsert_Ordine = "INSERT INTO [dbo].[PP_magaord] ([id], [anno], [progressivo], [nriga], [articolo_id], [causale_id], [doctipo_id], [sezionale], [maga_lotto], [destinazione_id], [dataconsegna], [qnt], [lista_id], [vano_id], [vettore_id], [pagina], [info_row], [info_full], [pausable], [maga_id], [movtype], [stato], [ddtinforequired]) VALUES ({0}, {1}, {2}, {3}, '{4}', '{5}', '{6}', '{7}', '{8}', '{9}', '{10}', {11}, '{12}', '{13}', '{14}', '{15}', '{16}', '{17}', {18}, '{19}', {20}, {21}, {22});";
 
-            string SQLUpdateReadyPro = "UPDATE Bolle SET [Aspetto merce] = '{0}', [Causale bolla] = {1} WHERE [ID bolla] = {2};";
+            //istruzioni UPDATE
+            string SQLUpdate_Articolo = "UPDATE [dbo].[PP_articolo] SET [ubicazione] = '{0}', [cod_fornitore] = '{1}' WHERE [id] = '{2}' AND [maga_id] = '{3}'";
+
+            //UPDATE ERP
+            string SQLUpdate_Bolle = "UPDATE Bolle SET [ID gruppo] = {0}, [Numero di colli] = {1}, [Aspetto merce] = '{2}' WHERE [ID bolla] = {3};";
+            //string SQLUpdate_BolleDettaglio = "UPDATE [Bolle dettaglio] SET [Quantita' rientrata] = {0} WHERE [ID bolla dettaglio] = {1};";
+            string SQLUpdate_MagaMov = "UPDATE PP_magamov SET erp_update = {0} WHERE id = {1};";
 
             StringBuilder sbSQL = new StringBuilder();
 
@@ -124,10 +93,10 @@ namespace PaddyPicking
                 int idxRow = 1;
                 foreach (PackServices.ReadyPro.Data.Models.PaddyPicking item in list)
                 {
-                    //EventLog.WriteEntry(nameof(PaddyService), "idxRow: " + idxRow + "; Id:" + item.id.ToString(), EventLogEntryType.Information);
+                    //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : ID " + item.id, EventLogEntryType.Information);
 
                     string[] splitDestinazione = item.destinazione.Split('|');
-                    string[] splitDestinazioneBolla = item.destinazione_bolla.Replace("$", string.Empty).Replace("{", string.Empty).Replace("}", string.Empty).Split('|');
+                    string[] splitDestinazioneBolla = string.IsNullOrEmpty(item.destinazione_bolla) ? new string[0] : item.destinazione_bolla.Replace("$", string.Empty).Replace("{", string.Empty).Replace("}", string.Empty).Split('|');
 
                     string destinazioneID = item.destinazione_id == 0 ? item.destinazione_idanagrafica.ToString() : string.Concat(item.destinazione_idanagrafica.ToString(), "_", item.destinazione_id.ToString());
 
@@ -156,8 +125,8 @@ namespace PaddyPicking
                             glotto = "N",
                             gmatr = "N",
                             note = item.articolo_note,
-                            ubicazione = string.IsNullOrEmpty(item.articolo_ubicazione) ? "nd" : item.articolo_ubicazione,
-                            cod_fornitore = string.IsNullOrEmpty(item.cod_fornitore) ? "nd" : item.cod_fornitore
+                            ubicazione = string.IsNullOrEmpty(item.articolo_ubicazione.Trim()) ? "nd" : item.articolo_ubicazione.Trim(),
+                            cod_fornitore = string.IsNullOrEmpty(item.cod_fornitore.Trim()) ? "nd" : item.cod_fornitore.Trim()
                         };
 
                         sbSQL.AppendLine(string.Format(SQLInsert_Articolo,
@@ -177,14 +146,19 @@ namespace PaddyPicking
                             articolo.ubicazione.Replace("'", "''"),
                             articolo.cod_fornitore.Replace("'", "''")));
 
-                        //_paddyPickingService.Create(articolo);
+                        //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : CREATE PP_articolo", EventLogEntryType.Information);
                     }
                     else
                     {
-                        articolo.ubicazione = string.IsNullOrEmpty(item.articolo_ubicazione) ? "nd" : item.articolo_ubicazione;
-                        articolo.cod_fornitore = string.IsNullOrEmpty(item.cod_fornitore) ? "nd" : item.cod_fornitore;
 
-                        //_paddyPickingService.Update(articolo);
+                        string ubicazione = string.IsNullOrEmpty(item.articolo_ubicazione.Trim()) ? "nd" : item.articolo_ubicazione.Trim();
+                        string cod_fornitore = string.IsNullOrEmpty(item.cod_fornitore.Trim()) ? "nd" : item.cod_fornitore.Trim();
+
+                        if (!articolo.ubicazione.Equals(ubicazione) || !articolo.cod_fornitore.Equals(cod_fornitore))
+                        {
+                            sbSQL.AppendLine(string.Format(SQLUpdate_Articolo, ubicazione.Replace("'", "''"), cod_fornitore.Replace("'", "''"), item.articolo_id, item.maga_id));
+                            //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : UPDATE PP_articolo [" + item.articolo_id + "]", EventLogEntryType.Information);
+                        }
                     }
 
                     //tabella PP_maga
@@ -207,7 +181,11 @@ namespace PaddyPicking
                             maga.maga_lotto.Replace("'", "''"),
                             maga.giac));
 
-                        //_paddyPickingService.Create(maga);
+                        //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : CREATE PP_maga", EventLogEntryType.Information);
+                    }
+                    else
+                    {
+                        //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : UPDATE PP_maga", EventLogEntryType.Information);
                     }
 
                     //tabella PP_destinazione
@@ -250,7 +228,11 @@ namespace PaddyPicking
                             destinazione.areaorder,
                             destinazione.prioritario.Value ? 1 : 0));
 
-                        //_paddyPickingService.Create(destinazione);
+                        //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : CREATE PP_destinazione", EventLogEntryType.Information);
+                    }
+                    else
+                    {
+                        //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : CREATE PP_destinazione", EventLogEntryType.Information);
                     }
 
                     //tabella PP_magaord
@@ -271,7 +253,7 @@ namespace PaddyPicking
                             destinazione_id = destinazione.id,
                             dataconsegna = item.dataconsegna,
                             qnt = (int)item.qnt,
-                            lista_id = item.lista_id,
+                            lista_id = item.urgente ? "URGENTE" : item.lista_id,
                             vano_id = item.vano_id,
                             vettore_id = item.vettore_id,
                             pagina = item.pagina,
@@ -309,26 +291,47 @@ namespace PaddyPicking
                             magaOrd.stato,
                             magaOrd.ddtinforequired.Value ? 1 : 0));
 
-                        //_paddyPickingService.Create(magaOrd);
+                        //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : CREATE PP_magaord", EventLogEntryType.Information);
+                    }
+                    else
+                    {
+                        //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : CREATE PP_magaord", EventLogEntryType.Information);
                     }
 
                     idxRow++;
                 }
 
+                //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : Esegui SCRIPT", EventLogEntryType.Information);
+
                 if (!string.IsNullOrEmpty(sbSQL.ToString()))
                     readyUtilita.EseguiScript(sbSQL.ToString());
+
+                //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : Pulisci SCRIPT", EventLogEntryType.Information);
 
                 //pulisco lo script
                 sbSQL.Clear();
 
+                //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : READ Missioni di magazzino ReadyPro", EventLogEntryType.Information);
+
                 //leggo i movimenti di magazzino confermati
-                var listReadyPro = _paddyPickingService.GetAllMagaMov().OrderBy(o => o.progressivo).ThenBy(o => o.magaord_nriga).ToList();
+                var listReadyPro = _paddyPickingService.GetMagaMov(0).OrderBy(o => o.progressivo).ThenBy(o => o.magaord_nriga).ToList();
 
                 foreach (PP_magamov item in listReadyPro)
-                    sbSQL.AppendLine(string.Format(SQLUpdateReadyPro, item.ingombro_merce, 60013, int.Parse(item.magaord_id)));
+                {
+                    if (item.vettore_id.Equals("RITIRA IL CLIENTE"))
+                        sbSQL.AppendLine(string.Format(SQLUpdate_Bolle, 20, string.IsNullOrEmpty(item.ingombro_merce) ? "0" : item.ingombro_merce, item.note.Replace("'", "''"), int.Parse(item.magaord_id)));
+                    else
+                        sbSQL.AppendLine(string.Format(SQLUpdate_Bolle, 27, string.IsNullOrEmpty(item.ingombro_merce) ? "0" : item.ingombro_merce, item.note.Replace("'", "''"), int.Parse(item.magaord_id)));
 
-                //if (!string.IsNullOrEmpty(sbSQL.ToString()))
-                //readyUtilita.EseguiScript(sbSQL.ToString());
+                    //sbSQL.AppendLine(string.Format(SQLUpdate_BolleDettaglio, item.qnt.Value, item.magaord_nriga));
+                    sbSQL.AppendLine(string.Format(SQLUpdate_MagaMov, 1, item.id));
+                }
+
+                //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : Esegui SCRIPT:" + sbSQL.ToString(), EventLogEntryType.Information);
+                //CommonUtility.WriteLog(CommonUtility.PathLog, nameof(PaddyService) + " - Esegui SCRIPT: " + sbSQL.ToString());
+
+                if (!string.IsNullOrEmpty(sbSQL.ToString()))
+                    readyUtilita.EseguiScript(sbSQL.ToString());
             }
             catch (Exception ex)
             {
@@ -341,50 +344,5 @@ namespace PaddyPicking
 
             EventLog.WriteEntry(nameof(PaddyService), "Check Entity : Inizio [" + dtInizio + "] | Fine [" + dtFine + "]", EventLogEntryType.Information);
         }
-
-        //protected void AggiornaReadyPro()
-        //{
-        //    string dtInizio = DateTime.Now.ToString();
-
-        //    StringBuilder sbSQL = new StringBuilder();
-
-        //    string SQLUpdate = "UPDATE Bolle SET [Aspetto merce] = '{0}', [Causale bolla] = {1} WHERE [ID bolla] = {2};";
-
-        //    try
-        //    {
-        //        var list = _paddyPickingService.GetAllMagaMov().OrderBy(o => o.progressivo).ThenBy(o => o.magaord_nriga).ToList();
-
-        //        foreach (PP_magamov item in list)
-        //        {
-        //            //var bolla = _documentService.GetBolle(int.Parse(item.magaord_id));
-
-        //            //if (string.IsNullOrEmpty(bolla.Aspetto_merce))
-        //            //{
-        //            //bolla.Aspetto_merce = list.Find(m => m.magaord_id == item.magaord_id).ingombro_merce;
-
-        //            //_documentService.Update(bolla);
-        //            //}
-
-        //            //readyUtilita.AggiornaCausale(int.Parse(item.magaord_id), 60013);
-
-        //            sbSQL.AppendLine(string.Format(SQLUpdate, item.ingombro_merce, 60013, int.Parse(item.magaord_id)));
-
-        //            //EventLog.WriteEntry(nameof(PaddyService), "Aggiorna Ready Pro : ID=" + item.magaord_id + ";Aspetto merce=" + bolla.Aspetto_merce, EventLogEntryType.Information);
-        //        }
-
-        //        EventLog.WriteEntry(nameof(PaddyService), "Aggiorna Ready Pro : " + sbSQL.ToString(), EventLogEntryType.Information);
-        //        //EventLog.WriteEntry(nameof(PaddyService), "Aggiorna Ready Pro : " + list.Count.ToString(), EventLogEntryType.Information);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        EventLog.WriteEntry(nameof(PaddyService), "Aggiorna Ready Pro : " + ex.Message, EventLogEntryType.Error);
-        //        CommonUtility.WriteLog(CommonUtility.PathLog, nameof(PaddyService) + " - Aggiorna Ready Pro : " + ex.Message);
-        //        CommonUtility.InvioMail(CommonUtility.EMailResponsabileIT, null, nameof(PaddyService) + " - Aggiorna Ready Pro", ex.Message, string.Empty, null);
-        //    }
-
-        //    string dtFine = DateTime.Now.ToString();
-
-        //    EventLog.WriteEntry(nameof(PaddyService), "Aggiorna Ready Pro : Inizio [" + dtInizio + "] | Fine [" + dtFine + "]", EventLogEntryType.Information);
-        //}
     }
 }
