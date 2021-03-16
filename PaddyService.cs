@@ -69,34 +69,59 @@ namespace PaddyPicking
         {
             string dtInizio = DateTime.Now.ToString();
 
-            //istruzioni INSERT
-            string SQLInsert_Articolo = "INSERT INTO [dbo].[PP_articolo] ([id], [maga_id], [vano_id], [descr], [descrprint], [cat], [catorder], [umxpz], [umisu], [multipli], [glotto], [gmatr], [note], [ubicazione], [cod_fornitore]) VALUES ('{0}', '{1}', '{2}', '{3}', '{4}', '{5}', '{6}', {7}, '{8}', {9}, '{10}', '{11}', '{12}', '{13}', '{14}');";
-            string SQLInsert_Magazzino = "INSERT INTO [dbo].[PP_maga] ([maga_id], [articolo_id], [vano_id], [maga_lotto], [giac]) VALUES ('{0}', '{1}', '{2}', '{3}', {4});";
-            string SQLInsert_Destinazione = "INSERT INTO [dbo].[PP_destinazione] ([id], [tipo], [ragso], [piva], [cf], [destinatario], [nazione], [indirizzo], [citta], [provincia], [cap], [note], [area], [areaorder], [prioritario]) VALUES ('{0}', '{1}', '{2}', '{3}', '{4}', '{5}', '{6}', '{7}', '{8}', '{9}', '{10}', '{11}', '{12}', {13}, {14});";
-            string SQLInsert_Ordine = "INSERT INTO [dbo].[PP_magaord] ([id], [anno], [progressivo], [nriga], [articolo_id], [causale_id], [doctipo_id], [sezionale], [maga_lotto], [destinazione_id], [dataconsegna], [qnt], [lista_id], [vano_id], [vettore_id], [pagina], [info_row], [info_full], [pausable], [maga_id], [movtype], [stato], [ddtinforequired]) VALUES ({0}, {1}, {2}, {3}, '{4}', '{5}', '{6}', '{7}', '{8}', '{9}', '{10}', {11}, '{12}', '{13}', '{14}', '{15}', '{16}', '{17}', {18}, '{19}', {20}, {21}, {22});";
+            //List<int> ordersException = new List<int>();
 
-            //istruzioni UPDATE
-            string SQLUpdate_Articolo = "UPDATE [dbo].[PP_articolo] SET [ubicazione] = '{0}', [cod_fornitore] = '{1}' WHERE [id] = '{2}' AND [maga_id] = '{3}'";
+            List<OrderListModel> orderList = new List<OrderListModel>();
+            List<OrderUserModel> orderUserList = new List<OrderUserModel>();
 
             //UPDATE ERP
             string SQLUpdate_Bolle = "UPDATE Bolle SET [ID gruppo] = {0}, [Numero di colli] = {1}, [Aspetto merce] = '{2}' WHERE [ID bolla] = {3};";
-            //string SQLUpdate_BolleDettaglio = "UPDATE [Bolle dettaglio] SET [Quantita' rientrata] = {0} WHERE [ID bolla dettaglio] = {1};";
+            string SQLUpdate_BolleDetteglio2 = "UPDATE [Bolle dettaglio 2] SET [Note linea] = '{0}' WHERE [ID bolla dettaglio] = {1};";
             string SQLUpdate_MagaMov = "UPDATE PP_magamov SET erp_update = {0} WHERE id = {1};";
-
-            //liste contente gli ID presenti nelle istruzioni insert
-            List<string> idsDestinazione = new List<string>();
-
-            StringBuilder sbSQL = new StringBuilder();
+            string SQLInsert_ListaPaddy = "IF NOT EXISTS (SELECT * FROM [Bolle blocchi] WHERE [ID bolla] = {0} AND [Nome campo] = 'PADDY_LISTA') BEGIN INSERT INTO [Bolle blocchi] ([ID blocco], RecordStatus, [ID bolla], [Nome campo], [Blocco testo]) VALUES ((SELECT MAX([ID blocco]) + 1 FROM [Bolle blocchi]), '{1}', {2}, 'PADDY_LISTA', '{3}') END";
 
             try
             {
+                #region Totale oridini per utente
+
+                //elenco degli stati da considerare per l'assegnazione degli ordini
+                int[] idsStato = new int[3] { 0, 1, 10 };
+
+                var orderUsers =
+                    from users in _paddyPickingService.GetAllPaddyPickingUsers().Where(u => u.assegna_ordini)
+                    join orders in _paddyPickingService.GetMagaOrd(idsStato) on users.nome equals orders.lista_id into leftJoin
+                    from lj in leftJoin.DefaultIfEmpty()
+                    group new { users, lj } by new { users.nome } into g
+                    select new { g.Key.nome, Totale = g.Count(x => x.lj != null) };
+                
+                foreach (var item in orderUsers)
+                    orderUserList.Add(new OrderUserModel { ListaID = item.nome, OrderTotal = item.Totale });
+
+                #endregion
+
                 //leggo gli ordini da inserire sul sistema Paddy Picking
                 var list = _paddyPickingService.GetAllPaddyPicking().ToList();
 
                 int idxRow = 1;
                 foreach (PackServices.ReadyPro.Data.Models.PaddyPicking item in list)
                 {
-                    //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : ID " + item.id, EventLogEntryType.Information);
+                    //if (ordersException.Contains(item.id))
+                    //    continue;
+
+                    //var checkErrors = list.Where(s => s.id == item.id && s.anno == item.anno && s.progressivo == item.progressivo)
+                    //    .GroupBy(n => n.articolo_id)
+                    //    .Select(n => new { articolo = n.Key, totaleRighe = n.Count() })
+                    //    .Where(n => n.totaleRighe > 1)
+                    //    .OrderBy(n => n.articolo);
+
+                    //if (checkErrors.Count() > 0) {
+                    //    ordersException.Add(item.id);
+                    //    EventLog.WriteEntry(nameof(PaddyService), "ORDINE SCARTATO : " + item.progressivo, EventLogEntryType.Error);
+                    //    continue;
+                    //}
+
+                    //Leggo l'utente da assegnare all'ordine, prendendo quello con meno ordini
+                    var user = orderUserList.OrderBy(o => o.OrderTotal).FirstOrDefault();
 
                     string[] splitDestinazione = item.destinazione.Split('|');
                     string[] splitDestinazioneBolla = string.IsNullOrEmpty(item.destinazione_bolla) ? new string[0] : item.destinazione_bolla.Replace("$", string.Empty).Replace("{", string.Empty).Replace("}", string.Empty).Split('|');
@@ -132,36 +157,15 @@ namespace PaddyPicking
                             cod_fornitore = string.IsNullOrEmpty(item.cod_fornitore.Trim()) ? "nd" : item.cod_fornitore.Trim()
                         };
 
-                        sbSQL.AppendLine(string.Format(SQLInsert_Articolo,
-                            articolo.id.Replace("'", "''"),
-                            articolo.maga_id.Replace("'", "''"),
-                            articolo.vano_id.Replace("'", "''"),
-                            articolo.descr.Replace("'", "''"),
-                            articolo.descrprint.Replace("'", "''"),
-                            articolo.cat.Replace("'", "''"),
-                            articolo.catorder.Replace("'", "''"),
-                            articolo.umxpz,
-                            articolo.umisu.Replace("'", "''"),
-                            articolo.multipli,
-                            articolo.glotto.Replace("'", "''"),
-                            articolo.gmatr.Replace("'", "''"),
-                            articolo.note.Replace("'", "''"),
-                            articolo.ubicazione.Replace("'", "''"),
-                            articolo.cod_fornitore.Replace("'", "''")));
-
-                        //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : CREATE PP_articolo", EventLogEntryType.Information);
+                        _paddyPickingService.Create(articolo);
                     }
                     else
                     {
-
                         string ubicazione = string.IsNullOrEmpty(item.articolo_ubicazione.Trim()) ? "nd" : item.articolo_ubicazione.Trim();
                         string cod_fornitore = string.IsNullOrEmpty(item.cod_fornitore.Trim()) ? "nd" : item.cod_fornitore.Trim();
 
                         if (!articolo.ubicazione.Equals(ubicazione) || !articolo.cod_fornitore.Equals(cod_fornitore))
-                        {
-                            sbSQL.AppendLine(string.Format(SQLUpdate_Articolo, ubicazione.Replace("'", "''"), cod_fornitore.Replace("'", "''"), item.articolo_id, item.maga_id));
-                            //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : UPDATE PP_articolo [" + item.articolo_id + "]", EventLogEntryType.Information);
-                        }
+                            _paddyPickingService.Update(articolo);
                     }
 
                     //tabella PP_maga
@@ -177,27 +181,13 @@ namespace PaddyPicking
                             giac = 0
                         };
 
-                        sbSQL.AppendLine(string.Format(SQLInsert_Magazzino,
-                            maga.maga_id.Replace("'", "''"),
-                            maga.articolo_id.Replace("'", "''"),
-                            maga.vano_id.Replace("'", "''"),
-                            maga.maga_lotto.Replace("'", "''"),
-                            maga.giac));
-
-                        //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : CREATE PP_maga", EventLogEntryType.Information);
-                    }
-                    else
-                    {
-                        //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : UPDATE PP_maga", EventLogEntryType.Information);
+                        _paddyPickingService.Create(maga);
                     }
 
                     //tabella PP_destinazione
                     var destinazione = _paddyPickingService.GetDestinazione(destinazioneID);
-                    if (destinazione is null && !idsDestinazione.Contains(destinazioneID))
+                    if (destinazione is null)
                     {
-                        //aggiuno la destinazione agli ID da inserire
-                        idsDestinazione.Add(destinazioneID);
-
                         destinazione = new PP_destinazione
                         {
                             id = destinazioneID,
@@ -205,7 +195,7 @@ namespace PaddyPicking
                             ragso = ragioneSociale,
                             piva = item.destinazione_piva,
                             cf = item.destinazione_cf,
-                            destinatario = destinatario,
+                            destinatario = destinatario.ToUpper(),
                             nazione = splitDestinazioneBolla.Length > 1 ? splitDestinazioneBolla.GetValue(8).ToString() : splitDestinazione.GetValue(3).ToString(),
                             indirizzo = splitDestinazioneBolla.Length > 1 ? splitDestinazioneBolla.GetValue(3).ToString() : splitDestinazione.GetValue(4).ToString(),
                             citta = splitDestinazioneBolla.Length > 1 ? splitDestinazioneBolla.GetValue(6).ToString() : splitDestinazione.GetValue(5).ToString(),
@@ -217,34 +207,63 @@ namespace PaddyPicking
                             prioritario = false
                         };
 
-                        sbSQL.AppendLine(string.Format(SQLInsert_Destinazione,
-                            destinazione.id.Replace("'", "''"),
-                            destinazione.tipo.Replace("'", "''"),
-                            destinazione.ragso.Replace("'", "''"),
-                            destinazione.piva.Replace("'", "''"),
-                            destinazione.cf.Replace("'", "''"),
-                            destinazione.destinatario.Replace("'", "''"),
-                            destinazione.nazione.Replace("'", "''"),
-                            destinazione.indirizzo.Replace("'", "''"),
-                            destinazione.citta.Replace("'", "''"),
-                            destinazione.provincia.Replace("'", "''"),
-                            destinazione.cap.Replace("'", "''"),
-                            destinazione.note.Replace("'", "''"),
-                            destinazione.area.Replace("'", "''"),
-                            destinazione.areaorder,
-                            destinazione.prioritario.Value ? 1 : 0));
-
-                        //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : CREATE PP_destinazione", EventLogEntryType.Information);
+                        _paddyPickingService.Create(destinazione);
                     }
                     else
                     {
-                        //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : CREATE PP_destinazione", EventLogEntryType.Information);
+                        //UNCLE BETO SRL
+                        if (destinazioneID == "20521")
+                        {
+                            var destinazioneAlternativa = _paddyPickingService.GetDestinazione(destinazioneID + "_", destinatario.ToUpper(), true);
+                            if (destinazioneAlternativa is null)
+                            {
+                                var destinazioneMax = _paddyPickingService.GetAllDestinazione(destinazioneID + "_");
+
+                                if (destinazioneMax is null || destinazioneMax.Count.Equals(0))
+                                    destinazioneID += "_1";
+                                else
+                                {
+                                    int maxID = int.Parse(destinazioneMax.Select(d => int.Parse(d.id.Split('_').GetValue(1).ToString())).Max().ToString());
+                                    destinazioneID += "_" + (maxID + 1).ToString();
+                                }
+
+                                destinazioneAlternativa = new PP_destinazione
+                                {
+                                    id = destinazioneID,
+                                    tipo = splitDestinazioneBolla.Length > 1 ? "C" : splitDestinazione.GetValue(0).ToString(),
+                                    ragso = ragioneSociale,
+                                    piva = item.destinazione_piva,
+                                    cf = item.destinazione_cf,
+                                    destinatario = destinatario.ToUpper(),
+                                    nazione = splitDestinazioneBolla.Length > 1 ? splitDestinazioneBolla.GetValue(8).ToString() : splitDestinazione.GetValue(3).ToString(),
+                                    indirizzo = splitDestinazioneBolla.Length > 1 ? splitDestinazioneBolla.GetValue(3).ToString() : splitDestinazione.GetValue(4).ToString(),
+                                    citta = splitDestinazioneBolla.Length > 1 ? splitDestinazioneBolla.GetValue(6).ToString() : splitDestinazione.GetValue(5).ToString(),
+                                    provincia = splitDestinazioneBolla.Length > 1 ? splitDestinazioneBolla.GetValue(7).ToString() : splitDestinazione.GetValue(6).ToString(),
+                                    cap = splitDestinazioneBolla.Length > 1 ? splitDestinazioneBolla.GetValue(5).ToString() : splitDestinazione.GetValue(7).ToString(),
+                                    note = "",
+                                    area = "",
+                                    areaorder = 0,
+                                    prioritario = false
+                                };
+
+                                _paddyPickingService.Create(destinazioneAlternativa);
+                            }
+
+                            //imposto la destinazione uguale a quella alternativa per permttere il corretto inserimento nell'ordine
+                            destinazione = destinazioneAlternativa;
+                        }
                     }
 
                     //tabella PP_magaord
                     var magaOrd = _paddyPickingService.GetMagaOrd(item.id, item.anno, item.progressivo, item.nriga);
                     if (magaOrd is null)
                     {
+                        //string assignedList = item.urgente ? "URGENTE" : destinazioneID == "20521" || destinazioneID.StartsWith("20521_") ? "UNCLE BETO" : item.pagamento_id.Equals(70) ? "ManoMano" : item.lista_id;
+                        string assignedList = AssegnaLista(orderList, item, list, user, destinazioneID);
+
+                        //valorizzo l'array contenente l'associazione ordine e lista di assegnazione
+                        orderList.Add(new OrderListModel(item.id, assignedList));                                               
+
                         magaOrd = new PP_magaord
                         {
                             id = item.id,
@@ -259,7 +278,7 @@ namespace PaddyPicking
                             destinazione_id = destinazione is null ? destinazioneID : destinazione.id,
                             dataconsegna = item.dataconsegna,
                             qnt = (int)item.qnt,
-                            lista_id = item.urgente ? "URGENTE" : item.lista_id,
+                            lista_id = assignedList,
                             vano_id = item.vano_id,
                             vettore_id = item.vettore_id,
                             pagina = item.pagina,
@@ -272,72 +291,68 @@ namespace PaddyPicking
                             ddtinforequired = item.ddtinforequired == 1 ? true : false
                         };
 
-                        sbSQL.AppendLine(string.Format(SQLInsert_Ordine,
-                            magaOrd.id,
-                            magaOrd.anno,
-                            magaOrd.progressivo,
-                            magaOrd.nriga,
-                            magaOrd.articolo_id.Replace("'", "''"),
-                            magaOrd.causale_id.Replace("'", "''"),
-                            magaOrd.doctipo_id.Replace("'", "''"),
-                            magaOrd.sezionale.Replace("'", "''"),
-                            magaOrd.maga_lotto.Replace("'", "''"),
-                            magaOrd.destinazione_id.Replace("'", "''"),
-                            magaOrd.dataconsegna.Replace("'", "''"),
-                            magaOrd.qnt,
-                            magaOrd.lista_id.Replace("'", "''"),
-                            magaOrd.vano_id.Replace("'", "''"),
-                            magaOrd.vettore_id.Replace("'", "''"),
-                            magaOrd.pagina.Replace("'", "''"),
-                            magaOrd.info_row.Replace("'", "''"),
-                            magaOrd.info_full.Replace("'", "''"),
-                            magaOrd.pausable.Value ? 1 : 0,
-                            magaOrd.maga_id.Replace("'", "''"),
-                            magaOrd.movtype,
-                            magaOrd.stato,
-                            magaOrd.ddtinforequired.Value ? 1 : 0));
-
-                        //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : CREATE PP_magaord", EventLogEntryType.Information);
-                    }
-                    else
-                    {
-                        //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : CREATE PP_magaord", EventLogEntryType.Information);
+                        _paddyPickingService.Create(magaOrd);
                     }
 
                     idxRow++;
                 }
 
-                //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : Esegui SCRIPT", EventLogEntryType.Information);
+                StringBuilder sbSQL = new StringBuilder();
+
+                #region Aggiornamento campi personalizzati ReadyPro
+
+                //aggiorno il campo PADDY_LISTA su ReadyPro per gli ordini aggiunti                
+                foreach (var item in orderList.Select(o => new { o.OrderID, o.LabelList }).Distinct())
+                    sbSQL.AppendLine(string.Format(SQLInsert_ListaPaddy, item.OrderID, CommonUtility.RecordStatus(), item.OrderID, item.LabelList));
 
                 if (!string.IsNullOrEmpty(sbSQL.ToString()))
                     readyUtilita.EseguiScript(sbSQL.ToString());
 
-                //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : Pulisci SCRIPT", EventLogEntryType.Information);
+                #endregion
 
-                //pulisco lo script
-                sbSQL.Clear();
-
-                //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : READ Missioni di magazzino ReadyPro", EventLogEntryType.Information);
+                #region Aggiornamento da Paddy a ReadyPro
 
                 //leggo i movimenti di magazzino confermati
                 var listReadyPro = _paddyPickingService.GetMagaMov(0).OrderBy(o => o.progressivo).ThenBy(o => o.magaord_nriga).ToList();
 
+                sbSQL.Clear();
                 foreach (PP_magamov item in listReadyPro)
                 {
-                    if (item.vettore_id.Equals("RITIRA IL CLIENTE"))
-                        sbSQL.AppendLine(string.Format(SQLUpdate_Bolle, 20, string.IsNullOrEmpty(item.ingombro_merce) ? "0" : item.ingombro_merce, item.note.Replace("'", "''"), int.Parse(item.magaord_id)));
-                    else
-                        sbSQL.AppendLine(string.Format(SQLUpdate_Bolle, 27, string.IsNullOrEmpty(item.ingombro_merce) ? "0" : item.ingombro_merce, item.note.Replace("'", "''"), int.Parse(item.magaord_id)));
+                    string aspettoMerce = item.note.Replace("'", "''").Trim();                    
+                    switch (aspettoMerce.ToUpper())
+                    {
+                        case "XS":
+                            aspettoMerce = "CARTONE 21x30x17";
+                            break;
+                        case "S":
+                            aspettoMerce = "CARTONE 30x30x40";
+                            break;
+                        case "M":
+                            aspettoMerce = "CARTONE 60x50x40";
+                            break;
+                        case "L":
+                            aspettoMerce = "CARTONE 75x65x55";
+                            break;
+                        case "XL":
+                            aspettoMerce = "CARTONE 100x60x60";
+                            break;
+                        default:
+                            break;
+                    }
 
-                    //sbSQL.AppendLine(string.Format(SQLUpdate_BolleDettaglio, item.qnt.Value, item.magaord_nriga));
+                    if (item.vettore_id.Equals("RITIRA IL CLIENTE"))
+                        sbSQL.AppendLine(string.Format(SQLUpdate_Bolle, 20, string.IsNullOrEmpty(item.ingombro_merce) ? "0" : item.ingombro_merce, aspettoMerce, int.Parse(item.magaord_id)));
+                    else
+                        sbSQL.AppendLine(string.Format(SQLUpdate_Bolle, 27, string.IsNullOrEmpty(item.ingombro_merce) ? "0" : item.ingombro_merce, aspettoMerce, int.Parse(item.magaord_id)));
+
+                    sbSQL.AppendLine(string.Format(SQLUpdate_BolleDetteglio2, item.qnt.Value, item.magaord_nriga));
                     sbSQL.AppendLine(string.Format(SQLUpdate_MagaMov, 1, item.id));
                 }
 
-                //EventLog.WriteEntry(nameof(PaddyService), "Check Entity : Esegui SCRIPT:" + sbSQL.ToString(), EventLogEntryType.Information);
-                //CommonUtility.WriteLog(CommonUtility.PathLog, nameof(PaddyService) + " - Esegui SCRIPT: " + sbSQL.ToString());
-
                 if (!string.IsNullOrEmpty(sbSQL.ToString()))
                     readyUtilita.EseguiScript(sbSQL.ToString());
+
+                #endregion
             }
             catch (Exception ex)
             {
@@ -349,6 +364,71 @@ namespace PaddyPicking
             string dtFine = DateTime.Now.ToString();
 
             EventLog.WriteEntry(nameof(PaddyService), "Check Entity : Inizio [" + dtInizio + "] | Fine [" + dtFine + "]", EventLogEntryType.Information);
+        }
+
+        private string AssegnaLista(List<OrderListModel> orderList, PackServices.ReadyPro.Data.Models.PaddyPicking paddyPickingItem, IList<PackServices.ReadyPro.Data.Models.PaddyPicking> paddyPickingList, OrderUserModel user, string destinazioneID)
+        {
+            string ListaID = paddyPickingList.Where(p => p.id == paddyPickingItem.id && p.anno == paddyPickingItem.anno && p.progressivo == paddyPickingItem.progressivo && !string.IsNullOrEmpty(p.lista_paddy)).Select(p => p.lista_paddy).FirstOrDefault();
+
+            var orderExist = orderList.Find(o => o.OrderID == paddyPickingItem.id);
+
+            if (!string.IsNullOrEmpty(paddyPickingItem.lista_paddy))
+                ListaID = paddyPickingItem.lista_paddy;
+            else if (paddyPickingItem.gruppo_id.Equals(28)) //Stampato Magazzino (Fornitore 1)
+                ListaID = "FORNITORE 1";
+            else if (paddyPickingItem.gruppo_id.Equals(29)) //Stampato Magazzino (Fornitore 2)
+                ListaID = "FORNITORE 2";
+            else if (paddyPickingItem.gruppo_id.Equals(30)) //Stampato Magazzino (Fornitore 3)
+                ListaID = "FORNITORE 3";
+            else if (paddyPickingItem.gruppo_id.Equals(31)) //Stampato Magazzino (Fornitore 4)
+                ListaID = "FORNITORE 4";
+            else if (paddyPickingItem.gruppo_id.Equals(32)) //Stampato Magazzino (Fornitore 5)
+                ListaID = "FORNITORE 5";
+            else if (paddyPickingItem.urgente)
+                ListaID = "URGENTE";
+            else if (destinazioneID == "20521" || destinazioneID.StartsWith("20521_"))
+                ListaID = "UNCLE BETO";
+            else if (paddyPickingItem.pagamento_id.Equals(70))
+                ListaID = "ManoMano";
+            else
+            {
+                if (orderExist is null)
+                {
+                    if (string.IsNullOrEmpty(ListaID))
+                        ListaID = paddyPickingItem.lista_id;
+                }
+                else
+                    ListaID = orderExist.LabelList;
+
+                //if (orderExist is null) {
+                //    if (string.IsNullOrEmpty(ListaID)) {
+                //        ListaID = user.ListaID;
+                //        user.OrderTotal += 1;
+                //    }
+                //} else {
+                //    ListaID = orderExist.LabelList;
+                //}
+            }
+
+            return ListaID;
+        }
+    }
+
+    public class OrderUserModel
+    {
+        public string ListaID { get; set; }
+        public int OrderTotal { get; set; }
+    }
+
+    public class OrderListModel
+    {
+        public int OrderID { get; set; }
+        public string LabelList { get; set; }
+
+        public OrderListModel(int _orderID, string _labelList)
+        {
+            OrderID = _orderID;
+            LabelList = _labelList;
         }
     }
 }
