@@ -75,10 +75,13 @@ namespace PaddyPicking
             List<OrderUserModel> orderUserList = new List<OrderUserModel>();
 
             //UPDATE ERP
-            string SQLUpdate_Bolle = "UPDATE Bolle SET [ID gruppo] = {0}, [Numero di colli] = {1}, [Aspetto merce] = '{2}' WHERE [ID bolla] = {3};";
-            string SQLUpdate_BolleDetteglio2 = "UPDATE [Bolle dettaglio 2] SET [Note linea] = '{0}' WHERE [ID bolla dettaglio] = {1};";
+            string SQLUpdate_Bolle = "UPDATE Bolle SET [Consegna urgente] = 0, [ID gruppo] = {0}, [Numero di colli] = {1}, [Aspetto merce] = '{2}' WHERE [ID bolla] = {3};";
+            //string SQLUpdate_BolleDetteglio2 = "UPDATE [Bolle dettaglio 2] SET [Note linea] = '{0}' WHERE [ID bolla dettaglio] = {1};";
+            string SQLUpdate_BolleDetteglio2 = "IF NOT EXISTS (SELECT * FROM [Bolle dettaglio 2] WHERE [ID bolla dettaglio] = {1}) BEGIN INSERT INTO [Bolle dettaglio 2] ([ID bolla dettaglio], RecordStatus, [Descrizione estesa], [Descrizione campo 2], [Descrizione campo 3], [Note linea], [Descrizione prezzo base], [Note arrivo], NoteLinea2, NoteLinea3, IdPreventivoAlfa, DataConsegnaPrevista) VALUES ({1}, NULL, NULL, NULL, NULL, '{0}', NULL, NULL, NULL, NULL, NULL, NULL) END ELSE BEGIN UPDATE [Bolle dettaglio 2] SET [Note linea] = '{0}' WHERE [ID bolla dettaglio] = {1} END";
             string SQLUpdate_MagaMov = "UPDATE PP_magamov SET erp_update = {0} WHERE id = {1};";
             string SQLInsert_ListaPaddy = "IF NOT EXISTS (SELECT * FROM [Bolle blocchi] WHERE [ID bolla] = {0} AND [Nome campo] = 'PADDY_LISTA') BEGIN INSERT INTO [Bolle blocchi] ([ID blocco], RecordStatus, [ID bolla], [Nome campo], [Blocco testo]) VALUES ((SELECT MAX([ID blocco]) + 1 FROM [Bolle blocchi]), '{1}', {2}, 'PADDY_LISTA', '{3}') END";
+
+            int UltimoProgressivo = 0;
 
             try
             {
@@ -93,7 +96,7 @@ namespace PaddyPicking
                     from lj in leftJoin.DefaultIfEmpty()
                     group new { users, lj } by new { users.nome } into g
                     select new { g.Key.nome, Totale = g.Count(x => x.lj != null) };
-                
+
                 foreach (var item in orderUsers)
                     orderUserList.Add(new OrderUserModel { ListaID = item.nome, OrderTotal = item.Totale });
 
@@ -105,6 +108,8 @@ namespace PaddyPicking
                 int idxRow = 1;
                 foreach (PackServices.ReadyPro.Data.Models.PaddyPicking item in list)
                 {
+                    UltimoProgressivo = item.progressivo;
+
                     //if (ordersException.Contains(item.id))
                     //    continue;
 
@@ -258,11 +263,10 @@ namespace PaddyPicking
                     var magaOrd = _paddyPickingService.GetMagaOrd(item.id, item.anno, item.progressivo, item.nriga);
                     if (magaOrd is null)
                     {
-                        //string assignedList = item.urgente ? "URGENTE" : destinazioneID == "20521" || destinazioneID.StartsWith("20521_") ? "UNCLE BETO" : item.pagamento_id.Equals(70) ? "ManoMano" : item.lista_id;
                         string assignedList = AssegnaLista(orderList, item, list, user, destinazioneID);
 
                         //valorizzo l'array contenente l'associazione ordine e lista di assegnazione
-                        orderList.Add(new OrderListModel(item.id, assignedList));                                               
+                        orderList.Add(new OrderListModel(item.id, assignedList));
 
                         magaOrd = new PP_magaord
                         {
@@ -288,10 +292,86 @@ namespace PaddyPicking
                             maga_id = item.maga_id,
                             movtype = item.movtype,
                             stato = item.stato,
-                            ddtinforequired = item.ddtinforequired == 1 ? true : false
+                            ddtinforequired = item.ddtinforequired == 1 ? true : false,
+                            data_creazione = DateTime.Now
                         };
 
                         _paddyPickingService.Create(magaOrd);
+                    }
+                    else
+                    {
+                        //if (item.destinazione_idanagrafica == 790257)
+                        //    EventLog.WriteEntry(nameof(PaddyService), "Check Entity [" + item.progressivo + "] : " + magaOrd.stato, EventLogEntryType.Warning);
+
+                        //se esiste ed è in stato cancellato(5), elimino la riga sul palmarino per permettere la gestione della missione di magazzino
+                        if (magaOrd.stato == 5)
+                        {
+                            //elimino la missione di magazzino presente a DB
+                            _paddyPickingService.Delete(magaOrd);
+
+                            EventLog.WriteEntry(nameof(PaddyService), "DELETED : " + magaOrd.progressivo + " - " + magaOrd.articolo_id + " - " + magaOrd.qnt + " - " + magaOrd.stato, EventLogEntryType.Warning);
+
+                            string assignedList = AssegnaLista(orderList, item, list, user, destinazioneID);
+
+                            //valorizzo l'array contenente l'associazione ordine e lista di assegnazione
+                            orderList.Add(new OrderListModel(item.id, assignedList));
+
+                            //magaOrd.articolo_id = item.articolo_id;
+                            //magaOrd.causale_id = item.causale_id;
+                            //magaOrd.doctipo_id = item.doctipo_id;
+                            //magaOrd.sezionale = item.sezionale;
+                            //magaOrd.maga_lotto = item.maga_lotto;
+                            //magaOrd.destinazione_id = destinazione is null ? destinazioneID : destinazione.id;
+                            //magaOrd.dataconsegna = item.dataconsegna;
+                            //magaOrd.qnt = (int)item.qnt;
+                            //magaOrd.lista_id = assignedList;
+                            //magaOrd.vano_id = item.vano_id;
+                            //magaOrd.vettore_id = item.vettore_id;
+                            //magaOrd.pagina = item.pagina;
+                            //magaOrd.info_row = item.info_row;
+                            //magaOrd.info_full = item.info_full;
+                            //magaOrd.pausable = item.pausable == 1 ? true : false;
+                            //magaOrd.maga_id = item.maga_id;
+                            //magaOrd.movtype = item.movtype;
+                            //magaOrd.stato = item.stato;
+                            //magaOrd.ddtinforequired = item.ddtinforequired == 1 ? true : false;
+                            //magaOrd.data_creazione = DateTime.Now;
+
+                            //object[] id = new object[4] { magaOrd.id, magaOrd.anno, magaOrd.progressivo, magaOrd.nriga };
+
+                            //_paddyPickingService.Update(id);
+
+                            //PP_magaord magaOrdReCreate = new PP_magaord
+                            //{
+                            //    id = item.id,
+                            //    anno = item.anno,
+                            //    progressivo = item.progressivo,
+                            //    nriga = (int)item.nriga,
+                            //    articolo_id = item.articolo_id,
+                            //    causale_id = item.causale_id,
+                            //    doctipo_id = item.doctipo_id,
+                            //    sezionale = item.sezionale,
+                            //    maga_lotto = item.maga_lotto,
+                            //    destinazione_id = destinazione is null ? destinazioneID : destinazione.id,
+                            //    dataconsegna = item.dataconsegna,
+                            //    qnt = (int)item.qnt,
+                            //    lista_id = assignedList,
+                            //    vano_id = item.vano_id,
+                            //    vettore_id = item.vettore_id,
+                            //    pagina = item.pagina,
+                            //    info_row = item.info_row,
+                            //    info_full = item.info_full,
+                            //    pausable = item.pausable == 1 ? true : false,
+                            //    maga_id = item.maga_id,
+                            //    movtype = item.movtype,
+                            //    stato = item.stato,
+                            //    ddtinforequired = item.ddtinforequired == 1 ? true : false,
+                            //    data_creazione = DateTime.Now
+                            //};
+
+                            //_paddyPickingService.Create(magaOrdReCreate);
+                        }
+
                     }
 
                     idxRow++;
@@ -318,7 +398,7 @@ namespace PaddyPicking
                 sbSQL.Clear();
                 foreach (PP_magamov item in listReadyPro)
                 {
-                    string aspettoMerce = item.note.Replace("'", "''").Trim();                    
+                    string aspettoMerce = item.note.Replace("+", "").Replace("'", "''").Trim();
                     switch (aspettoMerce.ToUpper())
                     {
                         case "XS":
@@ -340,25 +420,32 @@ namespace PaddyPicking
                             break;
                     }
 
+                    int ingombro = 1;
+                    int.TryParse(item.ingombro_merce, out ingombro);
+
                     if (item.vettore_id.Equals("RITIRA IL CLIENTE"))
-                        sbSQL.AppendLine(string.Format(SQLUpdate_Bolle, 20, string.IsNullOrEmpty(item.ingombro_merce) ? "0" : item.ingombro_merce, aspettoMerce, int.Parse(item.magaord_id)));
+                        sbSQL.AppendLine(string.Format(SQLUpdate_Bolle, 20, ingombro.Equals(0) ? 1 : ingombro, aspettoMerce, int.Parse(item.magaord_id)));
                     else
-                        sbSQL.AppendLine(string.Format(SQLUpdate_Bolle, 27, string.IsNullOrEmpty(item.ingombro_merce) ? "0" : item.ingombro_merce, aspettoMerce, int.Parse(item.magaord_id)));
+                        sbSQL.AppendLine(string.Format(SQLUpdate_Bolle, 27, ingombro.Equals(0) ? 1 : ingombro, aspettoMerce, int.Parse(item.magaord_id)));
 
                     sbSQL.AppendLine(string.Format(SQLUpdate_BolleDetteglio2, item.qnt.Value, item.magaord_nriga));
                     sbSQL.AppendLine(string.Format(SQLUpdate_MagaMov, 1, item.id));
                 }
 
                 if (!string.IsNullOrEmpty(sbSQL.ToString()))
+                {
+                    CommonUtility.WriteLog(CommonUtility.PathLog, "SQL : " + sbSQL.ToString());
                     readyUtilita.EseguiScript(sbSQL.ToString());
+                }
 
                 #endregion
             }
             catch (Exception ex)
             {
-                EventLog.WriteEntry(nameof(PaddyService), "Check Entity : " + ex.Message, EventLogEntryType.Error);
-                CommonUtility.WriteLog(CommonUtility.PathLog, nameof(PaddyService) + " - Check Entity : " + ex.Message);
-                CommonUtility.InvioMail(CommonUtility.EMailResponsabileIT, null, nameof(PaddyService) + " - Check Entity", ex.Message, string.Empty, null);
+                EventLog.WriteEntry(nameof(PaddyService), "Check Entity [" + UltimoProgressivo + "] : " + ex.Message, EventLogEntryType.Error);
+                EventLog.WriteEntry(nameof(PaddyService), "Check Entity [" + UltimoProgressivo + "] : " + ex.InnerException, EventLogEntryType.Error);
+                CommonUtility.WriteLog(CommonUtility.PathLog, nameof(PaddyService) + " - Check Entity [" + UltimoProgressivo + "] : " + ex.Message);
+                CommonUtility.InvioMail(CommonUtility.EMailResponsabileIT, null, nameof(PaddyService) + " - Check Entity [" + UltimoProgressivo + "]", ex.Message, string.Empty, null);
             }
 
             string dtFine = DateTime.Now.ToString();
@@ -374,16 +461,40 @@ namespace PaddyPicking
 
             if (!string.IsNullOrEmpty(paddyPickingItem.lista_paddy))
                 ListaID = paddyPickingItem.lista_paddy;
-            else if (paddyPickingItem.gruppo_id.Equals(28)) //Stampato Magazzino (Fornitore 1)
-                ListaID = "FORNITORE 1";
-            else if (paddyPickingItem.gruppo_id.Equals(29)) //Stampato Magazzino (Fornitore 2)
-                ListaID = "FORNITORE 2";
-            else if (paddyPickingItem.gruppo_id.Equals(30)) //Stampato Magazzino (Fornitore 3)
-                ListaID = "FORNITORE 3";
-            else if (paddyPickingItem.gruppo_id.Equals(31)) //Stampato Magazzino (Fornitore 4)
-                ListaID = "FORNITORE 4";
-            else if (paddyPickingItem.gruppo_id.Equals(32)) //Stampato Magazzino (Fornitore 5)
-                ListaID = "FORNITORE 5";
+            else if (paddyPickingItem.gruppo_id.Equals(28)) //Stampato Magazzino (MAUSER)
+                ListaID = "MAUSER";
+            else if (paddyPickingItem.gruppo_id.Equals(29)) //Stampato Magazzino (JCOPLASTIC)
+                ListaID = "JCOPLASTIC";
+            else if (paddyPickingItem.gruppo_id.Equals(30)) //Stampato Magazzino (SEMBOL)
+                ListaID = "SEMBOL";
+            else if (paddyPickingItem.gruppo_id.Equals(31)) //Stampato Magazzino (CASONE)
+                ListaID = "CASONE";
+            else if (paddyPickingItem.gruppo_id.Equals(32)) //Stampato Magazzino (I.C.S.)
+                ListaID = "I.C.S.";
+            else if (paddyPickingItem.gruppo_id.Equals(33)) //Stampato Magazzino (NERI)
+                ListaID = "NERI";
+            else if (paddyPickingItem.gruppo_id.Equals(34)) //Stampato Magazzino (KARTELL)
+                ListaID = "KARTELL";
+            else if (paddyPickingItem.gruppo_id.Equals(35)) //Stampato Magazzino (MOBIL PLASTIC)
+                ListaID = "MOBIL PLASTIC";
+            else if (paddyPickingItem.gruppo_id.Equals(36)) //Stampato Magazzino (P.P.E.)
+                ListaID = "P.P.E.";
+            else if (paddyPickingItem.gruppo_id.Equals(37)) //Stampato Magazzino (CARVEL)
+                ListaID = "CARVEL";
+            else if (paddyPickingItem.gruppo_id.Equals(38)) //Stampato Magazzino (OMCE)
+                ListaID = "OMCE";
+            else if (paddyPickingItem.gruppo_id.Equals(39)) //Stampato Magazzino (FASMA)
+                ListaID = "FASMA";
+            else if (paddyPickingItem.gruppo_id.Equals(40)) //Stampato Magazzino (Fornitori Vari)
+                ListaID = "FORNITORI VARI";
+            else if (paddyPickingItem.gruppo_id.Equals(41)) //Stampato Magazzino (RIMOL)
+                ListaID = "RIMOL";
+            else if (paddyPickingItem.gruppo_id.Equals(42)) //Stampato Magazzino (BERICAH)
+                ListaID = "BERICAH";
+            else if (paddyPickingItem.gruppo_id.Equals(43)) //Stampato Magazzino (SALL)
+                ListaID = "SALL";            
+            else if (paddyPickingItem.vettore_id == "RITIRA IL CLIENTE")
+                ListaID = "RITIRA IL CLIENTE";
             else if (paddyPickingItem.urgente)
                 ListaID = "URGENTE";
             else if (destinazioneID == "20521" || destinazioneID.StartsWith("20521_"))
@@ -392,22 +503,15 @@ namespace PaddyPicking
                 ListaID = "ManoMano";
             else
             {
-                if (orderExist is null)
-                {
-                    if (string.IsNullOrEmpty(ListaID))
-                        ListaID = paddyPickingItem.lista_id;
+                if (orderExist is null) {
+                    if (string.IsNullOrEmpty(ListaID)) {
+                        //ListaID = paddyPickingItem.lista_id;
+                        ListaID = user.ListaID;
+                        user.OrderTotal += 1;
+                    }
                 }
                 else
                     ListaID = orderExist.LabelList;
-
-                //if (orderExist is null) {
-                //    if (string.IsNullOrEmpty(ListaID)) {
-                //        ListaID = user.ListaID;
-                //        user.OrderTotal += 1;
-                //    }
-                //} else {
-                //    ListaID = orderExist.LabelList;
-                //}
             }
 
             return ListaID;

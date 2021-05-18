@@ -7,6 +7,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaddyPicking", "PaddyPickin
 EndProject
 Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "Setup.PaddyPicking", "..\..\Setup\Setup.PaddyPicking\Setup.PaddyPicking.vdproj", "{071AEDCA-BBC6-41A0-A04C-5FF2371378AE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PackServices.ReadyPro.Data", "..\..\Librerie\PackServices.ReadyPro.Data\PackServices.ReadyPro.Data.csproj", "{832DA213-F8D1-4387-9A44-288EDCAC779A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PackServices.ReadyPro.Services", "..\..\Librerie\PackServices.ReadyPro.Services\PackServices.ReadyPro.Services.csproj", "{06F44896-0817-4A58-AD71-4443EE2D484E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +25,14 @@ Global
 		{071AEDCA-BBC6-41A0-A04C-5FF2371378AE}.Debug|Any CPU.Build.0 = Debug
 		{071AEDCA-BBC6-41A0-A04C-5FF2371378AE}.Release|Any CPU.ActiveCfg = Release
 		{071AEDCA-BBC6-41A0-A04C-5FF2371378AE}.Release|Any CPU.Build.0 = Release
+		{832DA213-F8D1-4387-9A44-288EDCAC779A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{832DA213-F8D1-4387-9A44-288EDCAC779A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{832DA213-F8D1-4387-9A44-288EDCAC779A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{832DA213-F8D1-4387-9A44-288EDCAC779A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{06F44896-0817-4A58-AD71-4443EE2D484E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{06F44896-0817-4A58-AD71-4443EE2D484E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{06F44896-0817-4A58-AD71-4443EE2D484E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{06F44896-0817-4A58-AD71-4443EE2D484E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
