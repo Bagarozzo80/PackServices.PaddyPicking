@@ -76,7 +76,7 @@ namespace PaddyPicking
 
             //UPDATE ERP
             string SQLUpdate_Bolle = "UPDATE Bolle SET [Consegna urgente] = 0, [ID gruppo] = {0}, [Numero di colli] = {1}, [Aspetto merce] = '{2}' WHERE [ID bolla] = {3};";
-            //string SQLUpdate_BolleDetteglio2 = "UPDATE [Bolle dettaglio 2] SET [Note linea] = '{0}' WHERE [ID bolla dettaglio] = {1};";
+            string SQLUpdate_Bolle2 = "UPDATE [Bolle 2] SET DescrizioneContenuto = '{0}' WHERE [ID bolla] = {1};";
             string SQLUpdate_BolleDetteglio2 = "IF NOT EXISTS (SELECT * FROM [Bolle dettaglio 2] WHERE [ID bolla dettaglio] = {1}) BEGIN INSERT INTO [Bolle dettaglio 2] ([ID bolla dettaglio], RecordStatus, [Descrizione estesa], [Descrizione campo 2], [Descrizione campo 3], [Note linea], [Descrizione prezzo base], [Note arrivo], NoteLinea2, NoteLinea3, IdPreventivoAlfa, DataConsegnaPrevista) VALUES ({1}, NULL, NULL, NULL, NULL, '{0}', NULL, NULL, NULL, NULL, NULL, NULL) END ELSE BEGIN UPDATE [Bolle dettaglio 2] SET [Note linea] = '{0}' WHERE [ID bolla dettaglio] = {1} END";
             string SQLUpdate_MagaMov = "UPDATE PP_magamov SET erp_update = {0} WHERE id = {1};";
             string SQLInsert_ListaPaddy = "IF NOT EXISTS (SELECT * FROM [Bolle blocchi] WHERE [ID bolla] = {0} AND [Nome campo] = 'PADDY_LISTA') BEGIN INSERT INTO [Bolle blocchi] ([ID blocco], RecordStatus, [ID bolla], [Nome campo], [Blocco testo]) VALUES ((SELECT MAX([ID blocco]) + 1 FROM [Bolle blocchi]), '{1}', {2}, 'PADDY_LISTA', '{3}') END";
@@ -170,7 +170,15 @@ namespace PaddyPicking
                         string cod_fornitore = string.IsNullOrEmpty(item.cod_fornitore.Trim()) ? "nd" : item.cod_fornitore.Trim();
 
                         if (!articolo.ubicazione.Equals(ubicazione) || !articolo.cod_fornitore.Equals(cod_fornitore))
+                        {
+
+                            articolo.ubicazione = ubicazione;
+                            articolo.cod_fornitore = cod_fornitore;
+
                             _paddyPickingService.Update(articolo);
+
+                            EventLog.WriteEntry(nameof(PaddyService), "UPDATED: " + item.progressivo + "\nArticolo: " + item.articolo_id + "\nUbicazione: " + ubicazione + " | Cod.Fornitore: " + cod_fornitore + "\nUbicazione: " + articolo.ubicazione + " | Cod.Fornitore: " + articolo.cod_fornitore, EventLogEntryType.Warning);
+                        }
                     }
 
                     //tabella PP_maga
@@ -398,7 +406,8 @@ namespace PaddyPicking
                 sbSQL.Clear();
                 foreach (PP_magamov item in listReadyPro)
                 {
-                    string aspettoMerce = item.note.Replace("+", "").Replace("'", "''").Trim();
+                    //tronco la stringa a 50 perchè su ReadyPro il campo ha quella lunghezza
+                    string aspettoMerce = item.note.Trim().Length > 50 ? item.note.Replace("+", "").Replace("'", "''").Trim().Substring(0, 50) : item.note.Replace("+", "").Replace("'", "''").Trim();
                     switch (aspettoMerce.ToUpper())
                     {
                         case "XS":
@@ -423,12 +432,20 @@ namespace PaddyPicking
                     int ingombro = 1;
                     int.TryParse(item.ingombro_merce, out ingombro);
 
-                    if (item.vettore_id.Equals("RITIRA IL CLIENTE"))
-                        sbSQL.AppendLine(string.Format(SQLUpdate_Bolle, 20, ingombro.Equals(0) ? 1 : ingombro, aspettoMerce, int.Parse(item.magaord_id)));
-                    else
-                        sbSQL.AppendLine(string.Format(SQLUpdate_Bolle, 27, ingombro.Equals(0) ? 1 : ingombro, aspettoMerce, int.Parse(item.magaord_id)));
+                    //aggiorno i dati su Ready solo se la missione di magazzina ha delle quantità confermate
+                    if (item.qnt.HasValue && item.qnt.Value > 0)
+                    {
+                        if (item.vettore_id.Equals("RITIRA IL CLIENTE"))
+                            sbSQL.AppendLine(string.Format(SQLUpdate_Bolle, 20, ingombro.Equals(0) ? 1 : ingombro, aspettoMerce, int.Parse(item.magaord_id)));
+                        else
+                            sbSQL.AppendLine(string.Format(SQLUpdate_Bolle, 27, ingombro.Equals(0) ? 1 : ingombro, aspettoMerce, int.Parse(item.magaord_id)));
 
-                    sbSQL.AppendLine(string.Format(SQLUpdate_BolleDetteglio2, item.qnt.Value, item.magaord_nriga));
+                        if (item.note.Trim().Length > 50)
+                            sbSQL.AppendLine(string.Format(SQLUpdate_Bolle2, item.note.Replace("+", "").Replace("'", "''").Trim(), int.Parse(item.magaord_id)));
+
+                        sbSQL.AppendLine(string.Format(SQLUpdate_BolleDetteglio2, item.qnt.Value, item.magaord_nriga));
+                    }
+
                     sbSQL.AppendLine(string.Format(SQLUpdate_MagaMov, 1, item.id));
                 }
 
@@ -492,7 +509,7 @@ namespace PaddyPicking
             else if (paddyPickingItem.gruppo_id.Equals(42)) //Stampato Magazzino (BERICAH)
                 ListaID = "BERICAH";
             else if (paddyPickingItem.gruppo_id.Equals(43)) //Stampato Magazzino (SALL)
-                ListaID = "SALL";            
+                ListaID = "SALL";
             else if (paddyPickingItem.vettore_id == "RITIRA IL CLIENTE")
                 ListaID = "RITIRA IL CLIENTE";
             else if (paddyPickingItem.urgente)
@@ -503,8 +520,10 @@ namespace PaddyPicking
                 ListaID = "ManoMano";
             else
             {
-                if (orderExist is null) {
-                    if (string.IsNullOrEmpty(ListaID)) {
+                if (orderExist is null)
+                {
+                    if (string.IsNullOrEmpty(ListaID))
+                    {
                         //ListaID = paddyPickingItem.lista_id;
                         ListaID = user.ListaID;
                         user.OrderTotal += 1;
