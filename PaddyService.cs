@@ -162,7 +162,8 @@ namespace PaddyPicking
             List<OrderUserModel> orderUserList = new List<OrderUserModel>();
 
             //UPDATE ERP
-            string SQLUpdate_Bolle = "UPDATE Bolle SET [Consegna urgente] = 0, [ID gruppo] = {0}, [Numero di colli] = {1}, [Aspetto merce] = '{2}' WHERE [ID bolla] = {3};";
+            //string SQLUpdate_Bolle = "UPDATE Bolle SET [Consegna urgente] = 0, [ID gruppo] = {0}, [Numero di colli] = {1}, [Aspetto merce] = '{2}' WHERE [ID bolla] = {3};";
+            string SQLUpdate_Bolle = "UPDATE Bolle SET [Consegna urgente] = 0, [ID gruppo] = {0}, [Numero di colli] = {1} WHERE [ID bolla] = {2};";
             string SQLUpdate_Bolle2 = "UPDATE [Bolle 2] SET DescrizioneContenuto = '{0}' WHERE [ID bolla] = {1};";
             string SQLUpdate_BolleDetteglio2 = "IF NOT EXISTS (SELECT * FROM [Bolle dettaglio 2] WHERE [ID bolla dettaglio] = {1}) BEGIN INSERT INTO [Bolle dettaglio 2] ([ID bolla dettaglio], RecordStatus, [Descrizione estesa], [Descrizione campo 2], [Descrizione campo 3], [Note linea], [Descrizione prezzo base], [Note arrivo], NoteLinea2, NoteLinea3, IdPreventivoAlfa, DataConsegnaPrevista) VALUES ({1}, NULL, NULL, NULL, NULL, '{0}', NULL, NULL, NULL, NULL, NULL, NULL) END ELSE BEGIN UPDATE [Bolle dettaglio 2] SET [Note linea] = '{0}' WHERE [ID bolla dettaglio] = {1} END";
             string SQLUpdate_MagaMov = "UPDATE PP_magamov SET erp_update = {0} WHERE id = {1};";
@@ -567,14 +568,15 @@ namespace PaddyPicking
                     //aggiorno i dati su Ready solo se la missione di magazzina ha delle quantità confermate
                     if (item.qnt.HasValue && item.qnt.Value > 0)
                     {
-                        if (item.vettore_id.Equals("RITIRA IL CLIENTE"))
-                            sbSQL.AppendLine(string.Format(SQLUpdate_Bolle, 20, ingombro.Equals(0) ? 1 : ingombro, aspettoMerce, int.Parse(item.magaord_id)));
+                        if (item.vettore_id.Equals("RITIRA IL CLIENTE")) //20: Pronto Ritira il Cliente - 27: Pronto Paddy
+                            sbSQL.AppendLine(string.Format(SQLUpdate_Bolle, 27, ingombro.Equals(0) ? 1 : ingombro, int.Parse(item.magaord_id)));
                         else
-                            sbSQL.AppendLine(string.Format(SQLUpdate_Bolle, 27, ingombro.Equals(0) ? 1 : ingombro, aspettoMerce, int.Parse(item.magaord_id)));
+                            sbSQL.AppendLine(string.Format(SQLUpdate_Bolle, 27, ingombro.Equals(0) ? 1 : ingombro, int.Parse(item.magaord_id)));
 
-                        if (item.note.Trim().Length > 50)
-                            sbSQL.AppendLine(string.Format(SQLUpdate_Bolle2, item.note.Replace("+", "").Replace("'", "''").Trim(), int.Parse(item.magaord_id)));
+                        //if (item.note.Trim().Length > 50)
+                        //    sbSQL.AppendLine(string.Format(SQLUpdate_Bolle2, item.note.Replace("+", "").Replace("'", "''").Trim(), int.Parse(item.magaord_id)));
 
+                        sbSQL.AppendLine(string.Format(SQLUpdate_Bolle2, aspettoMerce, int.Parse(item.magaord_id)));
                         sbSQL.AppendLine(string.Format(SQLUpdate_BolleDetteglio2, item.qnt.Value, item.magaord_nriga));
                     }
 
