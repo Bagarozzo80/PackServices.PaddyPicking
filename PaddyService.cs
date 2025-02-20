@@ -558,6 +558,66 @@ namespace PaddyPicking
                         case "XL":
                             aspettoMerce = "CARTONE 100x60x60";
                             break;
+                        case "6/60":
+                            aspettoMerce = "BANCALE 60x80x60H";
+                            break;
+                        case "6/100":
+                            aspettoMerce = "BANCALE 60x80x100H";
+                            break;
+                        case "6/150":
+                            aspettoMerce = "BANCALE 60x80x150H";
+                            break;
+                        case "6/200":
+                            aspettoMerce = "BANCALE 60x80x200H";
+                            break;
+                        case "6/240":
+                            aspettoMerce = "BANCALE 60x80x240H";
+                            break;
+                        case "8/60":
+                            aspettoMerce = "BANCALE 80x120x60H";
+                            break;
+                        case "8/100":
+                            aspettoMerce = "BANCALE 80x120x100H";
+                            break;
+                        case "8/150":
+                            aspettoMerce = "BANCALE 80x120x150H";
+                            break;
+                        case "8/200":
+                            aspettoMerce = "BANCALE 80x120x200H";
+                            break;
+                        case "8/240":
+                            aspettoMerce = "BANCALE 80x120x240H";
+                            break;
+                        case "10/60":
+                            aspettoMerce = "BANCALE 100x120x60H";
+                            break;
+                        case "10/100":
+                            aspettoMerce = "BANCALE 100x120x100H";
+                            break;
+                        case "10/150":
+                            aspettoMerce = "BANCALE 100x120x150H";
+                            break;
+                        case "10/200":
+                            aspettoMerce = "BANCALE 100x120x200H";
+                            break;
+                        case "10/240":
+                            aspettoMerce = "BANCALE 100x120x240H";
+                            break;
+                        case "13/60":
+                            aspettoMerce = "BANCALE 130x130x60H";
+                            break;
+                        case "13/100":
+                            aspettoMerce = "BANCALE 130x130x100H";
+                            break;
+                        case "13/150":
+                            aspettoMerce = "BANCALE 130x130x150H";
+                            break;
+                        case "13/200":
+                            aspettoMerce = "BANCALE 130x130x200H";
+                            break;
+                        case "13/240":
+                            aspettoMerce = "BANCALE 130x130x240H";
+                            break;
                         default:
                             break;
                     }
